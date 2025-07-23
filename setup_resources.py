@@ -1,4 +1,5 @@
 import boto3
+import time
 import botocore
 from resources import region, source_bucket, destination_bucket, sns_topic_name, subscription_email
 
@@ -14,9 +15,16 @@ def create_bucket(bucket_name):
             CreateBucketConfiguration={'LocationConstraint': region}
         )
         print(f" Created bucket: {bucket_name}")
+        
+    # Wait until the bucket exists
+        waiter = s3.get_waiter('bucket_exists')
+        print(f"Waiting for bucket {bucket_name} to be available...")
+        waiter.wait(Bucket=bucket_name)
+        print(f"Bucket {bucket_name} is now ready.")
+        
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == 'BucketAlreadyOwnedByYou':
-            print(f"ℹ Bucket {bucket_name} already exists and is owned by you.")
+            print(f" Bucket {bucket_name} already exists and is owned by you.")
         else:
             print(f" Failed to create bucket {bucket_name}: {e}")
 
@@ -25,6 +33,7 @@ def create_sns_topic(topic_name):
     response = sns.create_topic(Name=topic_name)
     topic_arn = response['TopicArn']
     print(f" Created SNS topic: {topic_name}")
+    time.sleep(5) # Wait for the topic to be fully created
     return topic_arn
 
 # Function to subscribe email to SNS topic, note: the user must confirm the subscription
@@ -65,7 +74,8 @@ def setup_infrastructure():
     topic_arn = create_sns_topic(sns_topic_name)
     subscribe_email(topic_arn, subscription_email)
     write_config_to_file(topic_arn)
-    print(" Setup complete.")
+    print("\nAll resources created and ready.")
+    print("Please check your email and confirm the SNS subscription.")
     
 if __name__ == "__main__":
     setup_infrastructure()
